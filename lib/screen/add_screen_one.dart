@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:last_bucket/screen/preset_routine_screen.dart';
 
+import '../layout/write_layout.dart';
+import '../main.dart';
 import '../model/Routine.dart';
-import '../model/WeekItem.dart';
-import 'main_screen.dart';
+import '../model/SelectDateItem.dart';
+import 'routine_screen.dart';
 
 class AddOneScreen extends ConsumerStatefulWidget {
   const AddOneScreen({Key? key}) : super(key: key);
@@ -21,92 +24,102 @@ class _AddOneScreenState extends ConsumerState<AddOneScreen> {
   Widget build(BuildContext context) {
     final Routine routine = ref.watch(routineProvider);
 
-    return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: Column(
+    return WriteLayout(
+      title: '습관추가',
+      child: Column(
+        children: [
+          // select imoji and input text
+          Column(
+            mainAxisAlignment: MainAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const _Title(),
-              // select imoji and input text
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.all(10.0),
-                        child: Row(
-                          children: [
-                            Container(
-                              decoration: BoxDecoration(
-                                  border: Border.all(color: Colors.grey),
-                                  borderRadius: BorderRadius.circular(10)),
-                                child: _DropDownEmoticons()),
-                            Expanded(
-                              flex: 8,
-                              child: _InputText(
-                                hintText: '루틴명을 입력해주세요',
-                                value: routine.name,
-                                onChanged: (value) {
-                                  routine.name = value;
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
+              Padding(
+                padding: const EdgeInsets.all(10.0),
+                child: Row(
+                  children: [
+                    Container(
+                        decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey),
+                            borderRadius: BorderRadius.circular(10)),
+                        child: _DropDownEmoticons()),
+                    Expanded(
+                      flex: 8,
+                      child: _InputText(
+                        hintText: '루틴명을 입력해주세요',
+                        value: routine.name,
+                        onChanged: (value) {
+                          routine.name = value;
+                        },
                       ),
-                      Padding(
-                        padding: const EdgeInsets.all(10.0),
-                        child: _InputText(
-                          hintText: '상세설명',
-                          value: routine.description,
-                          onChanged: (value) {
-                            routine.description = value;
-                          },
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.all(8.0),
-                        child: _SelectTimes(),
-                      ),
-                      Wrap(
-                        spacing: 10,
-                        runSpacing: 10,
-                        children: ref.watch(weekItemsProvider).map((day) {
-                          // 홀수 짝수에 따라 색상 변경
-                          return _SelectTime(
-                              time: day,
-                              onTap: () {
-                                renderSelectTime(day);
-                              });
-                        }).toList(),
-                      ),
-                      // _DragProgressBar(
-                      //   count: count,
-                      //   onChanged: onChangeCount,
-                      // ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
-              // bottom button
-              _BottomButton(),
+              Padding(
+                padding: const EdgeInsets.all(10.0),
+                child: _InputText(
+                  hintText: '상세설명',
+                  value: routine.description,
+                  onChanged: (value) {
+                    routine.description = value;
+                  },
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(10.0),
+                child: Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: routine.sections.map((section) {
+                    // 홀수 짝수에 따라 색상 변경
+                    return _SelectTime(
+                        time: section,
+                        onTap: () => setState(() {
+                              section.select();
+                            }));
+                  }).toList(),
+                ),
+              ),
+              Padding(
+                padding: EdgeInsets.all(10.0),
+                child: Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: routine.days.map((section) {
+                    return _SelectTime(
+                        time: section,
+                        onTap: () => renderSelected(section));
+                  }).toList(),
+                ),
+              ),
+              _DragProgressBar(
+                count: routine.dragItem,
+                onChanged: (value) {
+                  setState(() {
+                    routine.dragItem = value;
+                  });
+                },
+              ),
             ],
           ),
-        ),
+          // bottom button
+          // _BottomButton(
+          //   onTab: () {
+          //     ref.read(routineProvider).addRoutine();
+          //     Navigator.pop(context);
+          //   },
+          // ),
+        ],
       ),
     );
   }
 
-  void renderSelectTime(day) {
+  renderSelected(SelectDateItem day) {
     setState(() {
       {
         // all check
-        day.isSelected = !day.isSelected;
-        List weekItems = ref.watch(weekItemsProvider);
+        day.select();
+        List<SelectDateItem> weekItems = ref.watch(routineProvider).days;
         if (day.day == "매일") {
           weekItems
               .where((element) => element.types.contains('매일'))
@@ -150,7 +163,7 @@ class _AddOneScreenState extends ConsumerState<AddOneScreen> {
 
         if (day.day != '매일' || day.day != '주중' || day.day != '주말') {
           List selectedWeekItems =
-              weekItems.where((element) => element.isSelected).toList();
+              weekItems.where((element) => element.getSelected()).toList();
           bool isCheckMonday = selectedWeekItems
               .where((element) => element.day == '월')
               .toList()
@@ -301,9 +314,7 @@ class _DropDownEmoticons extends StatelessWidget {
             height: 0,
             color: Colors.deepPurpleAccent,
           ),
-          onChanged: (String? newValue) {
-
-          },
+          onChanged: (String? newValue) {},
           items: <String>['💧', '🥲', '😕', '😩']
               .map<DropdownMenuItem<String>>((String value) {
             return DropdownMenuItem<String>(
@@ -352,7 +363,9 @@ class _InputText extends StatelessWidget {
 }
 
 class _BottomButton extends StatelessWidget {
-  const _BottomButton({Key? key}) : super(key: key);
+  final VoidCallback onTab;
+
+  const _BottomButton({Key? key, required this.onTab}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -360,7 +373,9 @@ class _BottomButton extends StatelessWidget {
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton(
-        onPressed: () {},
+        onPressed: () {
+          onTab();
+        },
         child: const Text('저장'),
       ),
     );
@@ -380,7 +395,7 @@ class _SelectTimes extends StatelessWidget {
 }
 
 class _SelectTime extends StatelessWidget {
-  final WeekItem time;
+  final SelectDateItem time;
   Border border = Border.all(color: Colors.grey);
   Color color = Colors.white;
   final GestureTapCallback onTap;
@@ -394,15 +409,15 @@ class _SelectTime extends StatelessWidget {
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: time.isSelected ? Colors.blue : Colors.white,
+          color: time.getSelected() ? Colors.blue : Colors.white,
           border: border,
           borderRadius: BorderRadius.circular(5.0),
         ),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 15.0, vertical: 8.0),
+          padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 8.0),
           child: Text(
             time.day,
-            style: const TextStyle(fontSize: 18.0),
+            style: const TextStyle(fontSize: 20.0),
           ),
         ),
       ),
